@@ -2,12 +2,13 @@ name: Playwright Tests
 on:
     push:
         branches: [main]
-    # pull_request:
-    #   branches: [ main ]
+    pull_request:
+        branches: [main]
 
 jobs:
-    Run_test:
-        runs-on: ubuntu-20.04 # Choosing OS
+    test:
+        timeout-minutes: 60
+        runs-on: ubuntu-latest # Choosing OS
         strategy:
             matrix:
                 node-version: [14.17.0]
@@ -20,22 +21,49 @@ jobs:
                   node-version: ${{ matrix.node-version }}
                   cache: "npm"
               # trying to install npm packages
-            - run: npm i -g npm@latest
+            - name: Install dependencies
+              run: npm i -g npm@latest
             - run: npm i
-            - run: npx playwright install --with-deps
-            - run: npm install allure-commandline --save-dev
-            - name: run test
+            - name: Install Playwright Browsers
+              run: npx playwright install --with-deps
+            - name: Install Allure
+              run: npm install allure-commandline --save-dev
+            - name: run tests
               # trying to run tests
               run: npx playwright test
+
             - name: Create Report
               if: always()
               run: npx allure generate ./allure-results --clean
+            - uses: actions/upload-artifact@v2
+              if: always()
+              with:
+                  name: allure-results
+                  path: ./allure-results
+                  retention-days: 20
             - name: Upload artifact allure-report
               uses: actions/upload-artifact@v1
               if: always()
               with:
                   name: allure-report
                   path: ./allure-report
+            - name: Get Allure history
+              uses: actions/checkout@v2
+              if: always()
+              continue-on-error: true
+              with:
+                  ref: gh-pages
+                  path: gh-pages
+            - name: Test marketplace action
+              uses: simple-elf/allure-report-action@master
+              if: always()
+              id: allure-report
+              with:
+                  allure_results: allure-results
+                  gh_pages: gh-pages
+                  allure_report: allure-report
+                  allure_history: allure-history
+                  keep_reports: 20
             - name: Deploy report to Github Pages
               if: always()
               uses: peaceiris/actions-gh-pages@v2
